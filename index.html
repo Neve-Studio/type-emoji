@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Emoji Press · TYPE&amp;EMOJI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/p5@2.3.4/lib/p5.min.js"></script>
+  <script src="core.js"></script>
+  <script src="recipes.js"></script>
+  <script src="font.js"></script>
+</head>
+<body>
+  <main class="app">
+    <aside id="left" class="col">
+      <header>
+        <h1>Emoji Press</h1>
+        <p class="tag">TYPE&amp;EMOJI · NABA · GIORNO 2</p>
+      </header>
+
+      <section id="drop" class="drop">
+        <p>Trascina qui un font .ttf o .otf</p>
+        <label class="btn">Scegli un font<input type="file" id="fontFile" accept=".ttf,.otf" hidden></label>
+      </section>
+
+      <div id="sample">Aa Hamburgefonstiv</div>
+      <p id="fontName" class="muted"></p>
+
+      <h2>Misure del font</h2>
+      <dl id="measures"></dl>
+
+      <div class="row-head">
+        <h2>Primitive</h2>
+        <button id="reapply" class="link">Riparti dalle misure</button>
+      </div>
+      <div id="prims"></div>
+    </aside>
+
+    <section id="center" class="col">
+      <div class="toolbar">
+        <label>Seme <input type="number" id="seed" value="1" min="1" max="99999"></label>
+        <button id="newSeed">Nuovo seme</button>
+        <span class="grow"></span>
+        <button id="exportSvg">Esporta SVG</button>
+        <button id="exportJson">Salva preset</button>
+        <label class="btn">Carica preset<input type="file" id="jsonFile" accept=".json" hidden></label>
+      </div>
+      <div id="board"></div>
+      <p id="status" class="muted"></p>
+    </section>
+
+    <aside id="right" class="col">
+      <h2>Ricette</h2>
+      <p class="muted hint">Ogni emoji è qualche riga: <code>testa(); occhi('punti'); bocca('sorriso', 0.6);</code>
+        Le parole sono nel README. Se una ricetta ha un errore, la sua cella lo mostra e le altre continuano.</p>
+      <div id="recipes"></div>
+    </aside>
+  </main>
+  <script src="sketch.js"></script>
+</body>
+</html>
