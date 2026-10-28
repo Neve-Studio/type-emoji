@@ -3,61 +3,56 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Emoji Press · TYPE&amp;EMOJI</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet">
+  <title>Emoji Kit · TYPE&amp;EMOJI</title>
+  <link rel="icon" href="data:,">
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/p5@2.3.4/lib/p5.min.js"></script>
-  <script src="core.js"></script>
-  <script src="recipes.js"></script>
-  <script src="font.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="kits/comic-sans/kit.js"></script>
+  <script src="kit-tools.js"></script>
+  <script src="sketch.js"></script>
 </head>
 <body>
   <main class="app">
-    <aside id="left" class="col">
+    <aside class="side">
       <header>
-        <h1>Emoji Press</h1>
+        <h1>Emoji Kit</h1>
         <p class="tag">TYPE&amp;EMOJI · NABA · GIORNO 2</p>
       </header>
-
-      <section id="drop" class="drop">
-        <p>Trascina qui un font .ttf o .otf</p>
-        <label class="btn">Scegli un font<input type="file" id="fontFile" accept=".ttf,.otf" hidden></label>
-      </section>
-
-      <div id="sample">Aa Hamburgefonstiv</div>
-      <p id="fontName" class="muted"></p>
-
-      <h2>Misure del font</h2>
-      <dl id="measures"></dl>
-
-      <div class="row-head">
-        <h2>Primitive</h2>
-        <button id="reapply" class="link">Riparti dalle misure</button>
+      <div id="panel"></div>
+      <p class="muted">↑ ↓ sceglie la categoria · ← → cambia pezzo · spazio: Random</p>
+      <button id="random" class="primary">Random</button>
+      <div class="buttons">
+        <button id="png">Esporta PNG</button>
+        <button id="json">Salva JSON</button>
+        <button id="grid">Griglia di 100</button>
       </div>
-      <div id="prims"></div>
     </aside>
 
-    <section id="center" class="col">
-      <div class="toolbar">
-        <label>Seme <input type="number" id="seed" value="1" min="1" max="99999"></label>
-        <button id="newSeed">Nuovo seme</button>
-        <span class="grow"></span>
-        <button id="exportSvg">Esporta SVG</button>
-        <button id="exportJson">Salva preset</button>
-        <label class="btn">Carica preset<input type="file" id="jsonFile" accept=".json" hidden></label>
-      </div>
-      <div id="board"></div>
+    <section class="stage">
+      <div id="stage"></div>
       <p id="status" class="muted"></p>
     </section>
 
-    <aside id="right" class="col">
-      <h2>Ricette</h2>
-      <p class="muted hint">Ogni emoji è qualche riga: <code>testa(); occhi('punti'); bocca('sorriso', 0.6);</code>
-        Le parole sono nel README. Se una ricetta ha un errore, la sua cella lo mostra e le altre continuano.</p>
-      <div id="recipes"></div>
+    <aside class="side">
+      <h2>Carica i tuoi pezzi</h2>
+      <label class="btn">Zip del kit<input type="file" id="zipFile" accept=".zip" hidden></label>
+      <label class="btn">Cartella del kit<input type="file" id="folder" webkitdirectory multiple hidden></label>
+      <div class="cat-load">
+        <select id="catSelect" aria-label="Categoria da sostituire"></select>
+        <label class="btn">File di una categoria<input type="file" id="catFiles" accept=".svg,.png" multiple hidden></label>
+      </div>
+      <p class="muted">Lo zip e la cartella sostituiscono le categorie che contengono; i file di una categoria sostituiscono solo quella.</p>
+
+      <h2>Come si prepara un kit</h2>
+      <ul class="muted rules">
+        <li>Una cartella per categoria: <code>faccia/</code> <code>occhi/</code> <code>sopracciglia/</code> <code>bocca/</code> <code>accessori/</code></li>
+        <li>Ogni pezzo è un file <b>SVG</b> o <b>PNG trasparente</b>; il nome del file è il nome del pezzo.</li>
+        <li>Tutti i pezzi sulla <b>stessa tavola quadrata</b>, per esempio 1000 × 1000, con lo stesso centro: si sovrappongono senza aggiustamenti.</li>
+        <li>Disegna ogni pezzo dove starà sulla faccia (gli occhi in alto, la bocca in basso) e lascia vuoto il resto della tavola.</li>
+        <li>Il fondo resta trasparente: il colore della carta lo mette il tool.</li>
+      </ul>
     </aside>
   </main>
-  <script src="sketch.js"></script>
 </body>
 </html>

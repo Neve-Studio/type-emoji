@@ -1,109 +1,145 @@
-# TYPE&EMOJI - Emoji Press
+# TYPE&EMOJI - Emoji Kit
 
 Tool p5.js per il giorno 2 del workshop TYPE&EMOJI (NABA, 3-4/12/2026, Fabrizio Falcone e Simone Verduci).
 
-Si carica un font, il tool ne misura il carattere (spessore, contrasto, larghezza, occhio) e lo trasforma in primitive: da quelle nasce una famiglia di emoji, il subset del giorno 1 più 14 facce nuove scelte da un seme. Le primitive si spostano a mano, le emoji si riscrivono come ricette di poche righe, e la tavola si esporta in SVG vettoriale per il libretto.
+Un'emoji è una pila di pezzi, uno per categoria, come nei generatori di NFT a tratti: **faccia, occhi, sopracciglia, bocca, accessori**, dal basso verso l'alto. Ogni categoria si sfoglia con ‹ ›, il Random pesca un pezzo a caso per categoria (gli accessori possono anche non esserci), e si esporta l'emoji in PNG, la combinazione in JSON e una griglia di 100 emoji casuali in PNG.
 
-![Emoji Press con Times New Roman](docs/screens/03-font-times-ttf.png)
+I pezzi sono quelli disegnati il giorno 1 con i glifi del proprio carattere. All'avvio c'è un kit di esempio fatto con i glifi di Comic Sans.
 
-`reference/` contiene il prototipo Python del 27/10/2026 (Comic Sans, 14 emoji costruite da primitive condivise) e la sua tavola: è il punto di partenza.
+![L'emoji grande](docs/screens/01-emoji-grande.png)
+
+![Griglia di 100 combinazioni](docs/screens/02-griglia-100.png)
+
+La versione precedente del tool (Emoji Press: font → primitive → emoji) sta intera in [`archive/emoji-press-v1/`](archive/emoji-press-v1/).
 
 ## Come si apre
 
-Niente da installare, niente build. Serve la rete per p5.js (da jsdelivr) e, se manca Comic Sans, per Comic Neue (da Google Fonts).
+Servono solo un browser e la rete (p5.js e JSZip arrivano da CDN). Niente da installare, niente build.
 
-1. **Doppio clic** su `index.html`: si apre nel browser e funziona da `file://`.
-2. **Da un server statico**, per esempio dalla cartella del progetto: `python -m http.server 8000`, poi `http://localhost:8000`.
-3. **Su editor.p5js.org**: un nuovo sketch, poi si caricano `index.html`, `sketch.js`, `core.js`, `recipes.js`, `font.js` e `style.css` sostituendo quelli dell'editor. Non provato (vedi sotto).
+1. **Doppio clic su `index.html`.** Funziona anche da `file://`: il kit di esempio è anche in `kits/comic-sans/kit.js`, proprio per questo.
+2. **Da un server statico**, se il browser fa storie con i file locali:
+   ```
+   python -m http.server 8000
+   ```
+   e poi `http://localhost:8000`.
+3. **In editor.p5js.org** (non provato, vedi sotto): nuovo sketch, poi nel pannello dei file
+   - si sostituiscono `index.html`, `sketch.js` e `style.css` con quelli di questo repo;
+   - si carica `kit-tools.js`;
+   - si crea la cartella `kits`, dentro `comic-sans`, e dentro si carica `kit.js`.
 
-## Le tre colonne
+   Basta solo `kit.js` dal kit di esempio: gli SVG sono già dentro.
 
-- **Sinistra, il font.** Si trascina un `.ttf` o `.otf` sulla pagina (o «Scegli un font»). Il campione «Aa Hamburgefonstiv» si ridisegna col font, sotto ci sono le misure e gli slider delle primitive, che partono dalle misure. «Riparti dalle misure» rimette gli slider dove il font li aveva messi.
-- **Centro, la tavola.** Il subset del giorno 1 (14 emoji) e la famiglia del seme (14 facce nuove), ridisegnati a ogni movimento.
-- **Destra, le ricette.** Il testo di ogni emoji del subset, modificabile. Una ricetta con un errore lo scrive nella sua cella e nel suo riquadro; le altre continuano a disegnarsi.
+Tastiera: **↑ ↓** sceglie la categoria, **← →** cambia pezzo, **spazio** fa Random.
 
-In alto: **Seme** (un numero, sempre le stesse 14 facce per lo stesso numero), **Nuovo seme**, **Esporta SVG**, **Salva preset** e **Carica preset** (`.json` con primitive, ricette, seme e nome del font). Anche un preset si può trascinare sulla pagina.
+## I file
 
-## Le misure del font
-
-Il font si disegna a 400 px su una tela nascosta e si leggono i pixel, come nel prototipo Python.
-
-| Misura | Come | Diventa |
-|---|---|---|
-| Stelo / altezza maiuscole | larghezza della `l` a metà altezza / altezza della `H` | Spessore |
-| Contrasto della o | spessore del fianco / spessore in alto della `o` | Contrasto (`1 - 1/rapporto`) |
-| Asse della o | il raggio dal centro della `o` che incontra il tratto più sottile | Asse del contrasto (solo se c'è contrasto) |
-| Larghezza media | media degli avanzamenti a-z / altezza maiuscole | Larghezza (0,7 = 1,0) |
-| Altezza x / maiuscola | altezza della `x` / altezza della `H` | Controforme (0,7 = 1,0) |
-| Squadratura della o | dove il contorno della `o` taglia la diagonale del suo riquadro | Squadratura dei tondi |
-
-Terminali, apertura, raggio degli angoli, inclinazione e mano non si misurano: partono dai valori di default.
-
-## Le primitive
-
-| Slider | Cosa fa |
+| File | Cosa |
 |---|---|
-| Spessore (stelo / maiuscola) | lo spessore di ogni tratto, nella stessa proporzione stelo/maiuscola del font |
-| Contrasto | quanto si assottigliano i tratti che corrono lungo l'asse: 0 è monolineare, 0,9 è un Bodoni |
-| Asse del contrasto (°) | l'inclinazione del pennino: 0 è verticale, negativo come una penna calligrafica |
-| Terminali | come finisce un tratto aperto: tondo, tagliato dritto o tagliato obliquo |
-| Squadratura dei tondi | da 2 (ellisse) a 6 (quasi quadrato): testa, occhi, tondi |
-| Apertura | quanto si aprono le curve aperte (bocche, occhi chiusi, archi): 0 si chiudono, 1 si aprono |
-| Controforme (occhi, finestre) | la grandezza dei pieni e dei vuoti interni: occhi, lenti, finestre |
-| Raggio degli angoli | quanto si arrotondano gli spigoli di linee, poligoni e rettangoli |
-| Larghezza | stringe o allarga tutto in orizzontale, come un condensed o un extended |
-| Inclinazione (°) | il corsivo: inclina tutto, positivo verso destra |
-| Irregolarità della mano | quanto trema il tratto; 0 è un disegno tecnico |
-| Seme della mano | cambia il tremolio senza cambiarne la quantità; stesso numero, stesso tremolio (niente sfarfallio) |
+| `sketch.js` | **Il file da modificare** (161 righe): disegno, Random, regole, colori, animazioni, export |
+| `kit-tools.js` | Il codice di servizio: caricare i pezzi, il pannello, i pulsanti. Non serve toccarlo |
+| `index.html`, `style.css` | La pagina |
+| `kits/comic-sans/` | Il kit di esempio: una cartella per categoria con gli SVG, più `kit.js` con gli stessi dati |
+| `tools/make_comic_kit.py` | Lo script che genera il kit di esempio da `comic.ttf` |
+| `test/kit_test.py` | La prova automatica (Playwright) |
 
-## Le ricette
+## Come si prepara un kit
 
-Una ricetta è JavaScript con poche parole in più. Le coordinate stanno in un quadrato da -0,5 a 0,5, con `y` verso il basso: `(0, 0)` è il centro, `(0, -0.4)` è in alto. Gli angoli sono in gradi, 0 a destra e 90 in basso.
+1. **Una cartella per categoria**, con questi nomi: `faccia/` `occhi/` `sopracciglia/` `bocca/` `accessori/`.
+2. **Ogni pezzo è un file SVG o PNG trasparente.** Il nome del file è il nome del pezzo (`occhi/tondi.svg` → "tondi"); in pagina i pezzi vanno in ordine alfabetico.
+3. **Tutti i pezzi sulla stessa tavola quadrata**, per esempio 1000 × 1000, con lo stesso centro. Il tool li sovrappone tutti a tavola intera, senza spostarli.
+4. **Ogni pezzo si disegna dove starà sulla faccia**: gli occhi in alto, la bocca in basso, la lacrima sotto un occhio. Il resto della tavola resta vuoto.
+5. **Il fondo resta trasparente**: il colore della carta lo mette il tool (`PAPER` in `sketch.js`).
 
-```js
-testa();
-occhi('punti');
-bocca('sorriso', 0.6);
+Il modo più semplice è un file Illustrator o Figma con una tavola 1000 × 1000 e un livello per pezzo: si accende un livello alla volta e si esporta la tavola intera. Un SVG esportato senza `width` e `height` (il "responsive" di Illustrator) va bene lo stesso: il tool gli dà la misura della tavola.
+
+Poi si carica dalla colonna di destra:
+
+- **Zip del kit**: uno zip con le cartelle dentro (anche dentro una cartella in più, come fa il Mac quando comprime);
+- **Cartella del kit**: la cartella che contiene le cartelle delle categorie;
+- **File di una categoria**: si sceglie la categoria e si caricano i suoi file, che sostituiscono solo quella.
+
+Lo zip e la cartella sostituiscono solo le categorie che contengono: le altre restano quelle di prima. I file che non sono SVG o PNG (un `LEGGIMI.txt`, la `__MACOSX` del Mac) si ignorano; un file che non si legge è nominato in rosso sotto l'emoji.
+
+### Il kit di esempio
+
+`kits/comic-sans/` è fatto con glifi veri di Comic Sans (`C:\Windows\Fonts\comic.ttf`) convertiti in tracciati. Lo rigenera:
+
+```
+python tools/make_comic_kit.py
 ```
 
-| Parola | Cosa disegna |
-|---|---|
-| `testa()` | il contorno della faccia |
-| `occhi(tipo, grandezza = 1, y = -0.08)` | `'punti'`, `'grandi'`, `'chiusi'`, `'occhiolino'`, `'lenti'` |
-| `bocca(tipo, ampiezza = 1)` | `'sorriso'`, `'triste'`, `'smorfia'`, `'aperta'`, `'o'`, `'piatta'` |
-| `sopracciglia(tipo)` | `'arrabbiate'`, `'tristi'`, `'alzate'` (con le sopracciglia conviene `occhi('punti', 1, -0.04)`) |
-| `linea([x, y], [x, y], ...)` | una linea aperta per i punti dati |
-| `poligono([x, y], ...)` | una linea chiusa |
-| `arco(cx, cy, rx, ry, da, a)` | un arco di ellisse da un angolo all'altro (sente l'apertura) |
-| `tondo(cx, cy, rx, ry)` | un tondo (sente la squadratura) |
-| `punto(x, y, r)` | un pieno, come un occhio |
-| `rettangolo(cx, cy, w, h)` | un rettangolo dal centro |
-| `finestre(colonne, righe, larghezza, altezza, cy)` | una griglia di finestre piene |
-| `porta(x, base, w, h)` | una porta che poggia su `base` |
-| `tenda(x0, x1, y0, y1, quante)` | una tenda a festoni, come nel negozio |
+(serve `fontTools`: `pip install fonttools`). Lo script scrive gli SVG, `kit.js` e stampa questa tabella.
 
-Si può usare tutto JavaScript: `for (const y of [-0.1, 0.1]) linea([-0.2, y], [0.2, y]);`. Un nome sbagliato (`occhi('storti')`) o una parentesi mancante diventano un messaggio rosso nella cella, non una pagina rotta.
+![Il kit di esempio](docs/screens/03-kit-di-esempio.png)
 
-## Comic Sans e Comic Neue
+| Categoria | Pezzo | Glifi |
+|---|---|---|
+| faccia | tonda | `O` |
+| faccia | ovale | `0` |
+| faccia | parentesi | `(` `)` |
+| occhi | punti | `.` |
+| occhi | tondi | `o` |
+| occhi | felici | `^` |
+| occhi | croce | `x` |
+| occhi | chiusi | `)` ruotata di 90° |
+| occhi | stelle | `*` |
+| sopracciglia | dritte | `-` |
+| sopracciglia | onda | `~` |
+| sopracciglia | arrabbiate | `/` ruotata di 35° e `\` ruotata di -35° |
+| bocca | sorriso | `)` ruotata di 90° |
+| bocca | triste | `)` ruotata di -90° |
+| bocca | risata | `D` ruotata di 90° |
+| bocca | stupita | `O` |
+| bocca | piatta | `_` |
+| accessori | lacrima | `,` ruotata di -20° |
+| accessori | sonno | `Z` `z` |
+| accessori | stupore | `!` |
+| accessori | dubbio | `?` |
 
-Il preset di partenza è Comic Sans MS, se il sistema ce l'ha (Windows e macOS sì). Il tool lo misura dal font di sistema, senza bisogno del file. Se il browser non lo trova (Linux, Chromebook) usa **Comic Neue** da Google Fonts (licenza OFL), e lo dice sotto il campione: «Comic Neue (al posto di Comic Sans)».
+Gli occhi e le sopracciglia sono lo stesso glifo ripetuto due volte.
 
-## Cosa è provato e cosa no
+## Il pomeriggio: tre punti in `sketch.js`
 
-`python test/press_test.py` (Playwright con Edge, headless) apre la pagina da `file://` e poi da un server statico, carica `C:/Windows/Fonts/comic.ttf` e `times.ttf`, muove quattro primitive, cambia seme e controlla che lo stesso seme ridia le stesse facce, rompe una ricetta in due modi e controlla che le altre 27 celle si disegnino, esporta SVG (28 gruppi vettoriali, niente `NaN`) e JSON, cambia i valori e ricarica il JSON controllando che tornino uguali, e salva gli screenshot in `docs/screens/`. Nessun errore in console. Ultima prova: 27/10/2026, Windows 11, Edge, p5.js 2.3.4.
+In `sketch.js` ci sono tre punti segnati `===== COLORI =====`, `===== REGOLE =====` e `===== ANIMAZIONI =====`. Ognuno ha esempi pronti: si tolgono i `//` davanti e si ricarica la pagina.
 
-Misure ottenute: Comic Sans (di sistema e `comic.ttf`, uguali) stelo/maiuscola 0,122, contrasto 0,97, larghezza 0,652, x/maiuscola 0,702, squadratura 2,14; Times New Roman stelo/maiuscola 0,121, contrasto 2,77, asse -10°, larghezza 0,693, x/maiuscola 0,675, squadratura 2,06.
+- **COLORI**, la funzione `inkOf(cat, c)`: di che colore si disegna un pezzo. Esempi: gli occhi sempre rossi; ogni faccia ha il suo colore e lo dà a tutta l'emoji.
+- **REGOLE**, la funzione `allowed(c)`: il Random le chiede se la combinazione va bene, e se no la rifà. Esempi: gli occhi chiusi non escono mai con la lacrima; gli occhi a croce escono una volta su dieci.
+- **ANIMAZIONI**, dentro `drawEmoji`: prima di disegnare un pezzo lo si può nascondere, spostare, ingrandire. Esempi: gli occhi sbattono, la bocca respira, gli accessori dondolano.
 
-Non provato:
+Le regole valgono anche per la griglia di 100. Gli export restano fermi (sono il fotogramma 0).
 
-- il trascinamento con un mouse vero (il test passa i file dal selettore, che usa la stessa funzione);
-- editor.p5js.org, Safari, Firefox, un Mac;
-- un font senza i glifi `H l o x` (il tool lo dice nella barra di stato) o un font variabile;
-- l'apertura dell'SVG in Illustrator o InDesign (si apre e si disegna in Edge);
-- Comic Neue al posto di Comic Sans: su questa macchina Comic Sans c'è sempre.
+![Regole e colori applicati](docs/screens/05-pomeriggio-regole-e-colori.png)
 
-Limiti noti:
+### Cinque prompt per l'AI
 
-- una ricetta con un ciclo infinito (`while (true)`) blocca la pagina: non c'è un timeout;
-- il nome del font viene dal nome del file (`times.ttf` diventa «times»), non dalla tabella dei nomi del font;
-- le curve più strette dello spessore del tratto (occhiolino, occhi chiusi) si disegnano come una catena di segmenti e dischi sovrapposti: in stampa è identico, ma in Illustrator quel tratto è fatto di tanti pezzi.
+Si incolla `sketch.js` nella chat e poi si chiede una cosa sola alla volta. Con i nomi dei propri pezzi, non con quelli del kit di esempio.
+
+1. «Nella funzione `allowed`, fai in modo che gli occhi `chiusi` non escano mai con l'accessorio `lacrima`.»
+2. «Nella funzione `inkOf`, dai a ogni faccia il suo colore (`tonda` blu, `ovale` rosso, `parentesi` verde) e usalo per tutti i pezzi dell'emoji.»
+3. «Nella parte ANIMAZIONI di `drawEmoji`, fai respirare la bocca: si ingrandisce e rimpicciolisce piano intorno al suo centro.»
+4. «Fai in modo che la bocca `triste` esca solo con le sopracciglia `arrabbiate` o senza accessori, e spiegami riga per riga cosa hai cambiato.»
+5. «Quando un'emoji ha gli occhi `stelle`, colorali di giallo e falli lampeggiare una volta al secondo; il resto resta com'è.»
+
+Se qualcosa si rompe, la console del browser (F12) dice la riga; si incolla l'errore nella chat.
+
+## Provato e non provato
+
+`python test/kit_test.py` (serve `pip install playwright pillow` ed Edge) apre la pagina con Edge headless **due volte, da `file://` e da `python -m http.server`**, e prova:
+
+- le frecce ‹ ›, il ciclo degli accessori fino a "nessuno", il clic su una riga, la tastiera (↑ ↓ ← →, spazio) senza che la pagina scorra;
+- il Random, con le frequenze su 3000 estrazioni;
+- l'export PNG (1000 × 1000), il JSON (uguale alla combinazione in pagina), la griglia (2000 × 2000);
+- uno zip costruito dal kit di esempio, con dentro un PNG trasparente, un SVG senza `width`/`height`, una cartella `__MACOSX` e un `.txt` da ignorare;
+- i file di una sola categoria (bocca) e una cartella intera;
+- nessun errore e nessun warning in console;
+- il pomeriggio, su una copia: scommenta la regola 1 e il colore 2, poi controlla 0 occhi chiusi con lacrima su 3000 Random e i pixel della faccia tutti nel suo colore.
+
+**Non provato:**
+
+- **editor.p5js.org**: le istruzioni sopra sono come dovrebbe funzionare, ma non l'ho caricato lì;
+- **Safari, Firefox e il Mac**: provato solo con Edge su Windows;
+- **gli esempi di ANIMAZIONI**: non c'è una prova automatica (lo sbattere degli occhi, il respiro, il dondolio), vanno guardati a occhio;
+- **il trascinamento** dei file sulla pagina: non c'è, si carica dai pulsanti;
+- **ricaricare un JSON salvato**: il JSON si salva ma il tool non lo rilegge.
+
+Per rifare gli screenshot di `docs/screens/` basta rilanciare il test.

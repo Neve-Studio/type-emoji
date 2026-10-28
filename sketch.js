@@ -1,305 +1,161 @@
-// Emoji Press: p5 sketch and interface. Geometry is in core.js, recipes in
-// recipes.js, font measuring in font.js.
+// EMOJI KIT - TYPE&EMOJI, NABA, giorno 2
+//
+// Un'emoji è una pila di pezzi, uno per categoria, come nei generatori di NFT a tratti.
+// I pezzi sono quelli disegnati il giorno 1 con i glifi del vostro carattere: si caricano
+// dalla pagina (uno zip, una cartella o una categoria alla volta, vedi il README).
+//
+// Questo è il file da modificare. Il codice di servizio (caricare i pezzi, il pannello,
+// i pulsanti) sta in kit-tools.js e non serve toccarlo.
+// I punti per il pomeriggio sono tre, segnati così: ===== COLORI =====, ===== REGOLE =====
+// e ===== ANIMAZIONI =====. Ognuno ha esempi pronti: basta togliere i // davanti.
 
-const BG = '#141410', INK = '#fbfbf9', MUTED = '#abab9c', ERR = '#e0705a';
-const COLS = 7;
-const $ = id => document.getElementById(id);
+// Le categorie, dal basso verso l'alto: la prima si disegna sotto a tutte le altre.
+const CATEGORIES = ['faccia', 'occhi', 'sopracciglia', 'bocca', 'accessori'];
+// Le categorie che possono anche restare vuote ("nessuno").
+const OPTIONAL = ['accessori'];
 
-const state = {
-  P: defaultPrims(),
-  recipes: { ...DEFAULT_RECIPES },
-  compiled: {},
-  seed: 1,
-  faces: [],
-  font: null,
-  fontLabel: '',
-  measures: null,
-};
-let board = null, ready = false;
+let kit = {};     // i pezzi caricati, per categoria: kit.occhi = [{ name: 'tondi', img }, ...]
+let combo = {};   // l'emoji di adesso: per ogni categoria il numero del pezzo (-1 = nessuno)
+let selected = 0; // la categoria scelta con le frecce su e giù
 
 async function setup() {
-  createCanvas($('board').clientWidth, 400).parent('board');
-  noLoop();
-  buildPrimControls();
-  buildRecipeEditors();
-  bindUI();
-  setSeed(1);
-  ready = true;
-  await useFont(await presetFont());
-}
-
-function windowResized() { refresh(); }
-
-// --- board layout, shared by the canvas and the SVG export ------------------
-
-function layout(W) {
-  const pad = 18, cell = (W - pad * 2) / COLS, labelH = 20, cells = [], texts = [];
-  let y = pad;
-  const section = (title, entries) => {
-    texts.push({ x: pad, y: y + 10, size: 13, text: title, strong: true });
-    y += 26;
-    entries.forEach((e, i) => {
-      const x = pad + (i % COLS) * cell, cy = y + Math.floor(i / COLS) * (cell + labelH);
-      cells.push({ ...e, x, y: cy, cell });
-      texts.push({ x: x + cell / 2, y: cy + cell + 6, size: 11, text: e.label, center: true });
-    });
-    y += Math.ceil(entries.length / COLS) * (cell + labelH) + 16;
-  };
-  section(`Subset · ${state.fontLabel}`, Object.keys(DEFAULT_RECIPES).map((k, i) => ({ key: k, label: k, compiled: state.compiled[k], index: i })));
-  section(`Famiglia · seme ${state.seed}`, state.faces.map((c, i) => ({ label: `nuova ${i + 1}`, compiled: c, index: 100 + i })));
-  return { cells, texts, W, H: y };
-}
-
-function cellResult(c) {
-  if (!c.compiled.fn) return { shapes: [], error: c.compiled.error };
-  return drawEmoji(c.compiled.fn, state.P, c.x + c.cell / 2, c.y + c.cell / 2, c.cell * 0.86, state.P.hand * 1000 + c.index);
-}
-
-function refresh() {
-  if (!ready) return;
-  const W = $('board').clientWidth;
-  board = layout(W);
-  if (width !== W || height !== Math.ceil(board.H)) resizeCanvas(W, Math.ceil(board.H), true);
-  redraw();
+  createCanvas(600, 600).parent('stage');
+  await loadStarterKit(); // il kit di esempio, kits/comic-sans
+  randomize();
 }
 
 function draw() {
-  if (!board) return;
-  background(BG);
-  noStroke();
-  textFont('system-ui');
-  for (const t of board.texts) {
-    fill(t.strong ? INK : MUTED);
-    textSize(t.size);
-    textAlign(t.center ? CENTER : LEFT, CENTER);
-    text(t.text, t.x, t.y);
-  }
-  const ctx = drawingContext, errors = {};
-  for (const c of board.cells) {
-    const r = cellResult(c);
-    if (r.error) {
-      if (c.key) errors[c.key] = r.error;
-      fill(ERR); textSize(11); textAlign(LEFT, TOP);
-      text('Errore: ' + r.error, c.x + 6, c.y + 8, c.cell - 12, c.cell - 16);
-      continue;
-    }
-    ctx.fillStyle = INK;
-    for (const rings of r.shapes) {
-      ctx.beginPath();
-      for (const ring of rings) {
-        ring.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
-        ctx.closePath();
-      }
-      ctx.fill('nonzero');
-    }
-  }
-  for (const k of Object.keys(DEFAULT_RECIPES)) {
-    const box = $('r-' + k);
-    box.classList.toggle('bad', !!errors[k]);
-    box.querySelector('.err').textContent = errors[k] ? 'Errore: ' + errors[k] : '';
-  }
+  drawEmoji(window, combo, width, frameCount); // window = la tela della pagina
 }
 
-// --- controls ---------------------------------------------------------------
+// ===== COLORI =====
+const PAPER = '#f4efe4'; // il fondo dell'emoji
 
-const fmt = v => typeof v === 'string' ? v : v.toLocaleString('it-IT', { maximumFractionDigits: 3 });
+// Di che colore si disegna un pezzo. null = com'è disegnato nel file.
+function inkOf(cat, c) {
+  // Esempio 1: gli occhi sono sempre rossi.
+  // if (cat === 'occhi') return '#d1495b';
 
-function buildPrimControls() {
-  for (const p of PRIMS) {
-    const row = document.createElement('div');
-    row.className = 'prim';
-    row.innerHTML = `<div class="lab"><span>${p.label}</span><b id="v-${p.key}"></b></div>`;
-    let input;
-    if (p.options) {
-      input = document.createElement('select');
-      input.innerHTML = p.options.map(o => `<option>${o}</option>`).join('');
-    } else {
-      input = document.createElement('input');
-      Object.assign(input, { type: 'range', min: p.min, max: p.max, step: p.step });
-    }
-    input.id = 'p-' + p.key;
-    input.addEventListener('input', () => {
-      state.P[p.key] = p.options ? input.value : Number(input.value);
-      $('v-' + p.key).textContent = fmt(state.P[p.key]);
-      refresh();
-    });
-    row.appendChild(input);
-    $('prims').appendChild(row);
-  }
-  setPrims(state.P);
+  // Esempio 2: ogni faccia ha il suo colore, e lo dà a tutta l'emoji.
+  // const colors = { tonda: '#2e86ab', ovale: '#d1495b', parentesi: '#3b8b5a' };
+  // return colors[nameOf('faccia', c)];
+
+  return null;
 }
 
-function setPrims(P) {
-  state.P = { ...state.P, ...P };
-  for (const p of PRIMS) {
-    $('p-' + p.key).value = state.P[p.key];
-    $('v-' + p.key).textContent = fmt(state.P[p.key]);
-  }
-  refresh();
+// ===== REGOLE =====
+// Il Random pesca un pezzo a caso per categoria, poi chiede qui se la combinazione va bene:
+// true = va bene, false = si rifà. Una combinazione rara è una che si rifà quasi sempre.
+function allowed(c) {
+  // Esempio 1: gli occhi chiusi non escono mai con la lacrima.
+  // if (nameOf('occhi', c) === 'chiusi' && nameOf('accessori', c) === 'lacrima') return false;
+
+  // Esempio 2: gli occhi a croce sono rari: li tiene una volta su dieci.
+  // if (nameOf('occhi', c) === 'croce' && random() > 0.1) return false;
+
+  return true;
 }
 
-function buildRecipeEditors() {
-  for (const k of Object.keys(DEFAULT_RECIPES)) {
-    const box = document.createElement('div');
-    box.className = 'recipe';
-    box.id = 'r-' + k;
-    box.innerHTML = `<label for="t-${k}">${k}</label><textarea id="t-${k}" spellcheck="false"></textarea><div class="err"></div>`;
-    $('recipes').appendChild(box);
-    box.querySelector('textarea').addEventListener('input', e => setRecipe(k, e.target.value));
-    setRecipe(k, state.recipes[k], true);
+// Disegna la combinazione c su g (la tela della pagina, o una tela nascosta per l'export),
+// in un quadrato grande size. t è il tempo in fotogrammi: 0 negli export, che restano fermi.
+function drawEmoji(g, c, size, t = 0) {
+  g.noStroke();
+  g.fill(PAPER);
+  g.rect(0, 0, size, size);
+  for (const cat of CATEGORIES) {
+    const piece = kit[cat]?.[c[cat]];
+    if (!piece) continue; // categoria vuota, o "nessuno"
+
+    // ===== ANIMAZIONI =====
+    // Prima di disegnare un pezzo lo si può nascondere, spostare, ruotare, ingrandire.
+    // Esempio 1: gli occhi sbattono: ogni 150 fotogrammi spariscono per 8.
+    // if (cat === 'occhi' && t % 150 > 142) continue;
+    g.push();
+    // Esempio 2: la bocca respira, intorno al suo centro (0.65 = la sua altezza sulla tavola).
+    // if (cat === 'bocca') { g.translate(size / 2, size * 0.65); g.scale(1 + 0.06 * sin(t * 0.08)); g.translate(-size / 2, -size * 0.65); }
+    // Esempio 3: gli accessori dondolano su e giù.
+    // if (cat === 'accessori') g.translate(0, size * 0.015 * sin(t * 0.1));
+
+    const ink = inkOf(cat, c);
+    g.image(ink ? inked(piece.img, ink) : piece.img, 0, 0, size, size);
+    g.pop();
   }
 }
 
-function setRecipe(k, src, updateEditor = false) {
-  state.recipes[k] = src;
-  state.compiled[k] = compileRecipe(src);
-  if (updateEditor) {
-    const t = $('t-' + k);
-    t.value = src;
-    t.rows = src.split('\n').length + 1;
+// Il nome del pezzo scelto in una categoria (per esempio 'tondi'), o null se non c'è.
+function nameOf(cat, c = combo) {
+  return kit[cat]?.[c[cat]]?.name ?? null;
+}
+
+// Il primo numero possibile in una categoria: -1 ("nessuno") se è facoltativa.
+function firstIndex(cat) {
+  return OPTIONAL.includes(cat) ? -1 : 0;
+}
+
+// Un pezzo a caso per categoria, finché le REGOLE non dicono che va bene.
+function randomCombo() {
+  for (let tries = 0; tries < 1000; tries++) {
+    const c = {};
+    for (const cat of CATEGORIES) c[cat] = floor(random(firstIndex(cat), kit[cat]?.length ?? 0));
+    if (allowed(c)) return c;
   }
-  refresh();
+  return { ...combo }; // nessuna combinazione permessa: le regole sono troppo strette
 }
 
-function setSeed(s) {
-  state.seed = Math.max(1, Math.floor(Number(s)) || 1);
-  $('seed').value = state.seed;
-  state.faces = newFaces(state.seed).map(compileRecipe);
-  refresh();
+function randomize() {
+  combo = randomCombo();
+  updatePanel();
 }
 
-async function useFont(f) {
-  state.font = f;
-  state.fontLabel = f.name;
-  $('sample').style.fontFamily = `"${f.family}"`;
-  $('fontName').textContent = f.name;
-  try {
-    state.measures = measureFont(f.family);
-    setPrims(measuresToPrims(state.measures));
-    status(`Misure prese da ${f.name}.`);
-  } catch (e) {
-    state.measures = null;
-    status(`Non riesco a misurare ${f.name}: ${e.message}`);
+// Il pezzo dopo (dir = 1) o prima (dir = -1) in una categoria; in fondo si ricomincia.
+function nextPiece(cat, dir) {
+  const first = firstIndex(cat);
+  const count = (kit[cat]?.length ?? 0) - first;
+  if (count <= 0) return;
+  combo[cat] = first + (combo[cat] - first + dir + count) % count;
+  updatePanel();
+}
+
+// Tastiera: su e giù scelgono la categoria, sinistra e destra cambiano pezzo, spazio = Random.
+function keyPressed() {
+  const n = CATEGORIES.length;
+  if (key === 'ArrowUp') selected = (selected + n - 1) % n;
+  else if (key === 'ArrowDown') selected = (selected + 1) % n;
+  else if (key === 'ArrowLeft') nextPiece(CATEGORIES[selected], -1);
+  else if (key === 'ArrowRight') nextPiece(CATEGORIES[selected], 1);
+  else if (key === ' ') randomize();
+  else return;
+  updatePanel();
+  return false; // la pagina non scorre
+}
+
+// L'emoji di adesso in PNG, su una tavola da 1000 x 1000.
+function savePNG() {
+  const g = createGraphics(1000, 1000);
+  g.pixelDensity(1);
+  drawEmoji(g, combo, 1000);
+  save(g, 'emoji.png');
+  g.remove();
+}
+
+// Quali pezzi formano l'emoji di adesso, in un .json.
+function saveCombo() {
+  const names = {};
+  for (const cat of CATEGORIES) names[cat] = nameOf(cat);
+  saveJSON(names, 'emoji.json');
+}
+
+// La tavola per il libretto: 100 combinazioni casuali, 10 per riga, con le stesse REGOLE.
+function saveGrid() {
+  const cell = 200;
+  const g = createGraphics(cell * 10, cell * 10);
+  g.pixelDensity(1);
+  for (let i = 0; i < 100; i++) {
+    g.push();
+    g.translate((i % 10) * cell, floor(i / 10) * cell);
+    drawEmoji(g, randomCombo(), cell);
+    g.pop();
   }
-  showMeasures();
-  refresh();
-}
-
-function showMeasures() {
-  const m = state.measures;
-  if (!m) { $('measures').innerHTML = ''; return; }
-  const rows = [
-    ['Stelo / altezza maiuscole', fmt(+m.stemCap.toFixed(3))],
-    ['Contrasto della o (lato / sopra)', fmt(+m.contrastRatio.toFixed(2))],
-    ['Asse della o', `${m.axis}°`],
-    ['Larghezza media (a-z / maiuscola)', fmt(+m.avgWidth.toFixed(3))],
-    ['Altezza x / maiuscola', fmt(+m.xHeight.toFixed(3))],
-    ['Squadratura della o (n)', fmt(+m.squareness.toFixed(2))],
-  ];
-  $('measures').innerHTML = rows.map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('');
-}
-
-function status(msg) { $('status').textContent = msg; }
-
-function bindUI() {
-  $('fontFile').addEventListener('change', e => e.target.files[0] && openFile(e.target.files[0]));
-  $('jsonFile').addEventListener('change', e => e.target.files[0] && openFile(e.target.files[0]));
-  $('seed').addEventListener('change', e => setSeed(e.target.value));
-  $('newSeed').addEventListener('click', () => setSeed(1 + Math.floor(Math.random() * 9999)));
-  $('reapply').addEventListener('click', () => state.measures && setPrims(measuresToPrims(state.measures)));
-  $('exportSvg').addEventListener('click', () => download(exportSvg(), 'image/svg+xml', 'svg'));
-  $('exportJson').addEventListener('click', () => download(JSON.stringify(presetJson(), null, 2), 'application/json', 'json'));
-  addEventListener('dragover', e => { e.preventDefault(); document.body.classList.add('dragging'); });
-  addEventListener('dragleave', () => document.body.classList.remove('dragging'));
-  addEventListener('drop', e => {
-    e.preventDefault();
-    document.body.classList.remove('dragging');
-    if (e.dataTransfer.files[0]) openFile(e.dataTransfer.files[0]);
-  });
-}
-
-async function openFile(file) {
-  try {
-    if (/\.json$/i.test(file.name)) applyPreset(JSON.parse(await file.text()));
-    else if (/\.(ttf|otf)$/i.test(file.name)) await useFont(await loadFontFile(file));
-    else status('Serve un .ttf, un .otf o un preset .json.');
-  } catch (e) {
-    status(`Non riesco ad aprire ${file.name}: ${e.message}`);
-  }
-}
-
-// --- presets ----------------------------------------------------------------
-
-function presetJson() {
-  return {
-    app: 'emoji-press',
-    version: 1,
-    font: state.fontLabel,
-    measures: state.measures,
-    primitives: state.P,
-    seed: state.seed,
-    recipes: state.recipes,
-  };
-}
-
-function applyPreset(j) {
-  if (!j || j.app !== 'emoji-press' || typeof j.primitives !== 'object') throw new Error('non è un preset di Emoji Press');
-  const P = {};
-  for (const p of PRIMS) {
-    const v = j.primitives[p.key];
-    if (p.options ? p.options.includes(v) : Number.isFinite(v)) P[p.key] = p.options ? v : Math.min(p.max, Math.max(p.min, v));
-  }
-  setPrims(P);
-  for (const k of Object.keys(DEFAULT_RECIPES)) if (typeof j.recipes?.[k] === 'string') setRecipe(k, j.recipes[k], true);
-  if (Number.isFinite(j.seed)) setSeed(j.seed);
-  if (j.font && j.font !== state.fontLabel) state.fontLabel = `${j.font} (dal preset)`;
-  status(`Preset caricato${j.font ? ': ' + j.font : ''}.`);
-  refresh();
-}
-
-// --- export -----------------------------------------------------------------
-
-function download(text, type, ext) {
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([text], { type }));
-  a.download = `emoji-press-${state.fontLabel.replace(/[^\w-]+/g, '_')}-seme${state.seed}.${ext}`;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-}
-
-const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-// A real vector board for the printed booklet: black on white, primitives and font underneath.
-function exportSvg() {
-  const W = 980, L = layout(W), out = [];
-  const txt = (x, y, size, s, opts = '') =>
-    out.push(`<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-size="${size}" dominant-baseline="middle" ${opts}>${esc(s)}</text>`);
-  for (const t of L.texts) txt(t.x, t.y, t.size, t.text, (t.center ? 'text-anchor="middle" ' : '') + `fill="${t.strong ? '#000' : '#555'}"`);
-  for (const c of L.cells) {
-    const r = cellResult(c);
-    if (r.error) { txt(c.x + 6, c.y + 14, 10, 'Errore: ' + r.error, 'fill="#b00"'); continue; }
-    // one path per shape, as on the canvas: overlapping shapes add up instead of cancelling
-    const paths = r.shapes.map(rings => `<path d="${rings.map(ring => 'M' + ring.map(([x, y]) => `${x.toFixed(1)} ${y.toFixed(1)}`).join('L') + 'Z').join('')}"/>`);
-    out.push(`<g id="${esc(c.key || 'nuova-' + (c.index - 99))}">${paths.join('')}</g>`);
-  }
-  let y = L.H + 6;
-  txt(18, y, 13, `Font: ${state.fontLabel}`, 'fill="#000"');
-  y += 22;
-  PRIMS.forEach((p, i) => txt(18 + (i % 2) * 470, y + Math.floor(i / 2) * 18, 11, `${p.label}: ${fmt(state.P[p.key])}`, 'fill="#333"'));
-  y += Math.ceil(PRIMS.length / 2) * 18 + 6;
-  const m = state.measures;
-  if (m) {
-    txt(18, y, 11, `Misure: stelo/maiuscola ${fmt(+m.stemCap.toFixed(3))} · contrasto o ${fmt(+m.contrastRatio.toFixed(2))} · asse ${m.axis}° · larghezza ${fmt(+m.avgWidth.toFixed(3))} · x/maiuscola ${fmt(+m.xHeight.toFixed(3))} · squadratura ${fmt(+m.squareness.toFixed(2))}`, 'fill="#555"');
-    y += 18;
-  }
-  txt(18, y, 10, 'Emoji Press · TYPE&EMOJI · NABA 2026', 'fill="#888"');
-  const H = Math.ceil(y + 20);
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="SF Pro Text, Helvetica, Arial, sans-serif">
-<rect width="${W}" height="${H}" fill="#fff"/>
-<g fill="#000">
-${out.join('\n')}
-</g>
-</svg>
-`;
+  save(g, 'griglia.png');
+  g.remove();
 }
