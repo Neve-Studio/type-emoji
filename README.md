@@ -1,5 +1,7 @@
 # TYPE&EMOJI - Emoji Kit
 
+**Online: https://neve-studio.github.io/type-emoji/** (GitHub Pages dalla radice di `master`: si apre dal browser, niente da scaricare).
+
 Tool p5.js per il giorno 2 del workshop TYPE&EMOJI (NABA, 3-4/12/2026, Fabrizio Falcone e Simone Verduci).
 
 Un'emoji è una pila di pezzi, uno per categoria, come nei generatori di NFT a tratti: **faccia, occhi, sopracciglia, bocca, accessori**, dal basso verso l'alto. Ogni categoria si sfoglia con ‹ ›, il Random pesca un pezzo a caso per categoria (gli accessori possono anche non esserci), e si esporta l'emoji in PNG, la combinazione in JSON e una griglia di 100 emoji casuali in PNG.
@@ -134,10 +136,14 @@ Se qualcosa si rompe, la console del browser (F12) dice la riga; si incolla l'er
 - nessun errore e nessun warning in console;
 - il pomeriggio, su una copia: scommenta la regola 1 e il colore 2, poi controlla 0 occhi chiusi con lacrima su 3000 Random e i pixel della faccia tutti nel suo colore.
 
+`python test/kit_test.py --online https://neve-studio.github.io/type-emoji/` rifà le stesse prove (pomeriggio escluso) sulla pagina pubblicata, controlla la risposta 200 e salva `docs/screens/07-online.png`.
+
+![La pagina online](docs/screens/07-online.png)
+
 **Non provato:**
 
 - **editor.p5js.org**: le istruzioni sopra sono come dovrebbe funzionare, ma non l'ho caricato lì;
-- **Safari, Firefox e il Mac**: provato solo con Edge su Windows;
+- **Safari, Firefox e il Mac**: provato con Edge su Windows e, sulla pagina online, con WebKit 18.2 di Playwright (il motore di Safari, ma girato su Windows); Safari vero su un Mac e Firefox no;
 - **gli esempi di ANIMAZIONI**: non c'è una prova automatica (lo sbattere degli occhi, il respiro, il dondolio), vanno guardati a occhio;
 - **il trascinamento** dei file sulla pagina: non c'è, si carica dai pulsanti;
 - **ricaricare un JSON salvato**: il JSON si salva ma il tool non lo rilegge.

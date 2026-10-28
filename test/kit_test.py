@@ -8,6 +8,10 @@ the project and checks they work. No console errors allowed. Saves dark screensh
 docs/screens/.
 
     python test/kit_test.py
+
+With a URL it runs the same checks on the published page instead and saves 07-online.png:
+
+    python test/kit_test.py --online https://neve-studio.github.io/type-emoji/
 """
 import base64
 import functools
@@ -16,6 +20,7 @@ import io
 import json
 import re
 import shutil
+import sys
 import tempfile
 import threading
 import zipfile
@@ -243,8 +248,36 @@ def kit_sheet(ctx):
     page.screenshot(path=SCREENS / "03-kit-di-esempio.png", full_page=True)
 
 
+def online(url):
+    with tempfile.TemporaryDirectory() as t, sync_playwright() as p:
+        tmp = Path(t)
+        browser = p.chromium.launch(channel="msedge")
+        ctx = browser.new_context(viewport={"width": 1280, "height": 800}, color_scheme="dark", accept_downloads=True)
+        probe = ctx.new_page()
+        status = probe.goto(url).status
+        assert status == 200, status
+        probe.close()
+        page = open_page(ctx, url)
+        assert page.evaluate("() => location.protocol") == "https:"
+        (tmp / "out").mkdir(), (tmp / "kit").mkdir()
+        folder = run(page, tmp / "out", tmp / "kit", False)
+        page.goto(url)
+        page.wait_for_function("() => kit.accessori?.length && document.querySelectorAll('.row').length === 5", timeout=20000)
+        page.evaluate("() => { combo = {faccia: 0, occhi: 4, sopracciglia: 1, bocca: 2, accessori: 3}; updatePanel(); }")
+        page.wait_for_timeout(300)
+        page.screenshot(path=SCREENS / "07-online.png")
+        assert not page.errors, page.errors
+        print(json.dumps({"url": url, "status": status, "folder": folder}), flush=True)
+        try:
+            browser.close()
+        except Exception:
+            pass
+
+
 def main():
     SCREENS.mkdir(parents=True, exist_ok=True)
+    if sys.argv[1:2] == ["--online"]:
+        return online(sys.argv[2])
 
     class Quiet(http.server.SimpleHTTPRequestHandler):
         def log_message(self, *a):
