@@ -2,8 +2,9 @@
 
 Every piece is a list of glyphs from C:/Windows/Fonts/comic.ttf, each one centred on a point
 of the 1000x1000 board, scaled and rotated, then written as an SVG path. Writes one SVG per
-piece in kits/comic-sans/<category>/ and kits/comic-sans/kit.js (the same SVGs as data, so
+piece in kits/comic-sans/<layer>/ and kits/comic-sans/kit.js (the same SVGs as data, so
 the page can load the kit from file:// too). Prints the glyph table for the README.
+The layer folders carry the stacking order as a prefix: 1-faccia is drawn first.
 
     python tools/make_comic_kit.py [path/to/font.ttf]
 """
@@ -23,13 +24,14 @@ KIT = ROOT / "kits" / "comic-sans"
 BOARD = 1000
 INK = "#1d1d1b"
 
-# Eye, brow and mouth lines on the board: every piece of a category sits on the same spot.
+# Eye, brow and mouth lines on the board: every piece of a layer sits on the same spot.
 EYE_Y, BROW_Y, MOUTH_Y = 445, 345, 650
 LEFT, RIGHT = 375, 625
 
 
 def g(char, x, y, h=None, w=None, rot=0):
-    """One glyph centred on (x, y), h (or w) px tall (or wide) before rotating, rot degrees clockwise."""
+    """One glyph centred on (x, y), h (or w) px tall (or wide) before rotating, rot degrees clockwise.
+    With both h and w the glyph is stretched to that box."""
     return dict(char=char, x=x, y=y, h=h, w=w, rot=rot)
 
 
@@ -38,12 +40,12 @@ def pair(char, y, **kw):
 
 
 PIECES = {
-    "faccia": {
+    "1-faccia": {
         "tonda": [g("O", 500, 500, h=760)],
         "ovale": [g("0", 500, 500, h=780)],
         "parentesi": [g("(", 240, 500, h=780), g(")", 760, 500, h=780)],
     },
-    "occhi": {
+    "2-occhi": {
         "punti": pair(".", EYE_Y, h=70),
         "tondi": pair("o", EYE_Y, h=120),
         "felici": pair("^", EYE_Y, w=130),
@@ -51,19 +53,19 @@ PIECES = {
         "chiusi": pair(")", EYE_Y, h=140, rot=90),
         "stelle": pair("*", EYE_Y, h=120),
     },
-    "sopracciglia": {
+    "3-sopracciglia": {
         "dritte": pair("-", BROW_Y, w=140),
         "onda": pair("~", BROW_Y, w=150),
         "arrabbiate": [g("\\", LEFT + 15, BROW_Y, h=130, rot=-35), g("/", RIGHT - 15, BROW_Y, h=130, rot=35)],
     },
-    "bocca": {
+    "4-bocca": {
         "sorriso": [g(")", 500, MOUTH_Y, h=320, rot=90)],
         "triste": [g(")", 500, MOUTH_Y + 30, h=280, rot=-90)],
         "risata": [g("D", 500, MOUTH_Y + 10, h=270, rot=90)],
         "stupita": [g("O", 500, MOUTH_Y + 10, h=150)],
         "piatta": [g("_", 500, MOUTH_Y, w=240)],
     },
-    "accessori": {
+    "5-accessori": {
         "lacrima": [g(",", RIGHT + 10, EYE_Y + 110, h=130, rot=-20)],
         "sonno": [g("Z", 830, 210, h=120), g("z", 905, 110, h=80)],
         "stupore": [g("!", 880, 160, h=210)],
@@ -78,10 +80,11 @@ def glyph_path(font, spec):
     bounds = BoundsPen(glyphs)
     glyph.draw(bounds)
     x0, y0, x1, y1 = bounds.bounds
-    s = spec["h"] / (y1 - y0) if spec["h"] else spec["w"] / (x1 - x0)
-    # Font units are y-up, the board is y-down: scale y by -s. In y-down space a positive angle turns clockwise.
+    sy = spec["h"] / (y1 - y0) if spec["h"] else spec["w"] / (x1 - x0)
+    sx = spec["w"] / (x1 - x0) if spec["w"] else sy
+    # Font units are y-up, the board is y-down: scale y by -sy. In y-down space a positive angle turns clockwise.
     t = (Transform().translate(spec["x"], spec["y"]).rotate(math.radians(spec["rot"]))
-         .scale(s, -s).translate(-(x0 + x1) / 2, -(y0 + y1) / 2))
+         .scale(sx, -sy).translate(-(x0 + x1) / 2, -(y0 + y1) / 2))
     pen = SVGPathPen(glyphs, ntos=lambda v: f"{v:.1f}".rstrip("0").rstrip("."))
     glyph.draw(TransformPen(pen, t))
     return pen.getCommands()
@@ -92,27 +95,30 @@ def describe(spec):
     return f"`{spec['char']}`{turn}"
 
 
-def main():
-    font = TTFont(sys.argv[1] if len(sys.argv) > 1 else "C:/Windows/Fonts/comic.ttf")
+def write_kit(kit, label, layers, font_path=None):
+    """Write the SVGs of layers ({folder: {piece: [glyphs]}}) and kit.js into kit, print the README table."""
+    font = TTFont(font_path or "C:/Windows/Fonts/comic.ttf")
     data, rows = {}, []
-    for cat, pieces in PIECES.items():
-        (KIT / cat).mkdir(parents=True, exist_ok=True)
-        data[cat] = []
+    for layer, pieces in layers.items():
+        (kit / layer).mkdir(parents=True, exist_ok=True)
+        data[layer] = []
         for name, specs in pieces.items():
-            d = " ".join(glyph_path(font, s) for s in specs)
+            # one path per glyph: overlapping glyphs in one path can cut holes in each other
+            paths = "".join(f'<path fill="{INK}" d="{glyph_path(font, s)}"/>' for s in specs)
             glyphs = " ".join(sorted({describe(s) for s in specs}))
             svg = (f'<svg xmlns="http://www.w3.org/2000/svg" width="{BOARD}" height="{BOARD}" viewBox="0 0 {BOARD} {BOARD}">'
-                   f'<title>{cat}/{name}: Comic Sans {glyphs.replace("`", "")}</title>'
-                   f'<path fill="{INK}" d="{d}"/></svg>\n')
-            (KIT / cat / f"{name}.svg").write_text(svg, encoding="utf-8")
-            data[cat].append({"name": name, "svg": svg.strip()})
-            rows.append(f"| {cat} | {name} | {glyphs} |")
-    js = ("// Generated by tools/make_comic_kit.py: the Comic Sans sample kit as data,\n"
+                   f'<title>{layer}/{name}: Comic Sans {glyphs.replace("`", "")}</title>'
+                   f'{paths}</svg>\n')
+            (kit / layer / f"{name}.svg").write_text(svg, encoding="utf-8")
+            data[layer].append({"name": name, "svg": svg.strip()})
+            rows.append(f"| {layer} | {name} | {glyphs} |")
+    js = (f"// Generated by tools/: the sample kit {kit.name} as data,\n"
           "// so the page loads it from file:// too. Do not edit: run the script again.\n"
-          f"window.STARTER_KIT = {json.dumps({'name': 'comic-sans', 'pieces': data}, ensure_ascii=False)};\n")
-    (KIT / "kit.js").write_text(js, encoding="utf-8")
-    print("| Categoria | Pezzo | Glifi |\n|---|---|---|\n" + "\n".join(rows))
+          f"(window.SAMPLE_KITS ||= {{}})[{json.dumps(kit.name)}] = "
+          f"{json.dumps({'label': label, 'pieces': data}, ensure_ascii=False)};\n")
+    (kit / "kit.js").write_text(js, encoding="utf-8")
+    print("| Livello | Pezzo | Glifi |\n|---|---|---|\n" + "\n".join(rows))
 
 
 if __name__ == "__main__":
-    main()
+    write_kit(KIT, "faccine", PIECES, sys.argv[1] if len(sys.argv) > 1 else None)
