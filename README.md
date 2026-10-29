@@ -6,7 +6,14 @@ Tool p5.js per il giorno 2 del workshop TYPE&EMOJI (NABA, 3-4/12/2026, Fabrizio 
 
 Un'emoji è una pila di pezzi, uno per livello, come nei generatori di NFT a tratti. **I livelli li decide il kit**: sono le sue cartelle, in ordine col numero davanti al nome. Una faccina può essere `1-faccia` `2-occhi` `3-sopracciglia` `4-bocca` `5-accessori`; un'auto `1-carrozzeria` `2-ruote` `3-finestrini` `4-fari` `5-extra`; un mostro, una casa, una pianta quello che serve. Ogni livello si sfoglia con ‹ › (passando da "nessuno"), il Random pesca un pezzo a caso per livello, e si esporta l'emoji in PNG, la combinazione in JSON e una griglia di 100 emoji casuali in PNG.
 
-I pezzi sono quelli disegnati il giorno 1 con i glifi del proprio carattere. Nella pagina ci sono due kit di esempio fatti con i glifi di Comic Sans: **faccine** (all'avvio) e **auto**, si sceglie dal menu in alto a sinistra.
+I pezzi sono quelli disegnati il giorno 1 con i glifi del proprio carattere. **La pagina parte vuota**: nessun kit, e al posto dell'emoji tre righe che dicono come preparare il proprio (cartelle numerate, un SVG o PNG trasparente per pezzo, tavola 1000 × 1000) e da dove caricarlo. Random, frecce ed export restano spenti finché non c'è un kit. Ci sono due kit di esempio fatti con i glifi di Comic Sans, **faccine** e **auto**: si caricano solo su richiesta, dal menu in alto a sinistra (che parte su "nessuno") o dall'indirizzo:
+
+- `?demo` carica le faccine, per la proiezione: https://neve-studio.github.io/type-emoji/?demo
+- `?kit=comic-sans` le faccine, `?kit=auto-comic-sans` le auto.
+
+![L'avvio vuoto](docs/screens/12-avvio-vuoto.png)
+
+![Le faccine con ?demo](docs/screens/13-demo.png)
 
 ![L'emoji grande](docs/screens/01-emoji-grande.png)
 
@@ -20,18 +27,22 @@ La versione precedente del tool (Emoji Press: font → primitive → emoji) sta 
 
 Servono solo un browser e la rete (p5.js e JSZip arrivano da CDN). Niente da installare, niente build.
 
-1. **Doppio clic su `index.html`.** Funziona anche da `file://`: i kit di esempio sono anche in `kits/comic-sans/kit.js` e `kits/auto-comic-sans/kit.js`, proprio per questo.
+1. **Doppio clic su `index.html`.** Funziona anche da `file://`: i kit di esempio sono anche in `kits/comic-sans/kit.js` e `kits/auto-comic-sans/kit.js`, proprio per questo. La pagina li legge solo quando li si sceglie: senza la cartella `kits/` funziona lo stesso, e il menu dice che il kit manca.
 2. **Da un server statico**, se il browser fa storie con i file locali:
    ```
    python -m http.server 8000
    ```
    e poi `http://localhost:8000`.
-3. **In editor.p5js.org** (non provato, vedi sotto): nuovo sketch, poi nel pannello dei file
-   - si sostituiscono `index.html`, `sketch.js` e `style.css` con quelli di questo repo;
-   - si carica `kit-tools.js`;
-   - si crea la cartella `kits`, dentro `comic-sans` e `auto-comic-sans`, e in ognuna si carica il suo `kit.js`.
+3. **In editor.p5js.org** (non provato, vedi sotto): nuovo sketch, poi nel pannello dei file si sostituiscono `index.html`, `sketch.js` e `style.css` con quelli di questo repo e si carica `kit-tools.js`. Bastano questi quattro file; i kit gli studenti li caricano dai pulsanti.
 
-   Basta solo `kit.js` da ogni kit di esempio: gli SVG sono già dentro.
+### I due zip
+
+`python tools/make_editor_zip.py` scrive in `dist/`:
+
+- **`emoji-kit-studenti.zip`**: solo `index.html`, `sketch.js`, `style.css`, `kit-tools.js`. Parte vuoto. È quello da dare agli studenti: https://neve-studio.github.io/type-emoji/dist/emoji-kit-studenti.zip
+- **`emoji-kit-demo.zip`**: gli stessi quattro file più `kits/comic-sans/` e `kits/auto-comic-sans/`, per far vedere gli esempi (menu, `?demo`, `?kit=`): https://neve-studio.github.io/type-emoji/dist/emoji-kit-demo.zip
+
+Gli zip sono nel repo e vanno rifatti quando cambia uno dei quattro file.
 
 Tastiera: **↑ ↓** sceglie il livello, **← →** cambia pezzo, **spazio** fa Random.
 
@@ -45,6 +56,7 @@ Tastiera: **↑ ↓** sceglie il livello, **← →** cambia pezzo, **spazio** f
 | `kits/comic-sans/` | Il kit di esempio delle faccine: una cartella per livello con gli SVG, più `kit.js` con gli stessi dati |
 | `kits/auto-comic-sans/` | Il kit di esempio delle auto, fatto allo stesso modo |
 | `tools/make_comic_kit.py`, `tools/make_car_kit.py` | Gli script che generano i due kit da `comic.ttf` |
+| `tools/make_editor_zip.py`, `dist/` | Lo script dei due zip e gli zip |
 | `test/kit_test.py` | La prova automatica (Playwright) |
 
 ## Come si prepara un kit
@@ -67,7 +79,7 @@ Poi si carica dalla colonna di destra:
 - **Cartella del kit o di un livello**: la cartella che contiene le cartelle dei livelli, oppure la cartella di un livello solo (`4-naso/`): il tool capisce da sé quale delle due;
 - **File di un livello**: si scrive il nome del livello nel campo (`4-naso`), poi si scelgono i file.
 
-**Caricare non cancella niente**: un livello con lo stesso nome di uno che c'è lo sostituisce, uno nuovo si aggiunge al posto del suo numero (a parità di numero, in ordine alfabetico), gli altri restano. Così si mescolano i kit: le faccine di uno con il naso di un altro. Per ripartire da zero c'è **Kit vuoto** nel menu in alto. Un livello ricaricato senza numero resta dov'era.
+**Caricare non cancella niente**: un livello con lo stesso nome di uno che c'è lo sostituisce, uno nuovo si aggiunge al posto del suo numero (a parità di numero, in ordine alfabetico), gli altri restano. Così si mescolano i kit: le faccine di uno con il naso di un altro. Per ripartire da zero c'è **Kit di esempio: nessuno** nel menu in alto. Un livello ricaricato senza numero resta dov'era.
 
 I kit fatti prima dei livelli liberi, con le cinque cartelle `faccia/` `occhi/` `sopracciglia/` `bocca/` `accessori/` senza numeri, funzionano ancora: quelle cinque tengono il loro ordine di sempre.
 
@@ -180,28 +192,32 @@ Se qualcosa si rompe, la console del browser (F12) dice la riga; si incolla l'er
 
 ## Provato e non provato
 
-`python test/kit_test.py` (serve `pip install playwright pillow` ed Edge) apre la pagina con Edge headless **due volte, da `file://` e da `python -m http.server`**, e prova:
+`python test/kit_test.py` (serve `pip install playwright pillow`, ed Edge o il Chromium di Playwright) rifà i due zip e apre la pagina headless **due volte, da `file://` e da `python -m http.server`**, e prova:
 
+- l'avvio vuoto: nessun livello, il menu su "nessuno", le tre righe di istruzioni, Random ed export spenti; frecce, spazio, clic forzati sui pulsanti spenti e `randomize()` dalla console senza errori; poi uno zip caricato, con frecce, Random, PNG, JSON e griglia;
+- `?demo` (le faccine) e `?kit=auto-comic-sans` (le auto);
+- la copia di `emoji-kit-studenti.zip` (solo i quattro file), da `file://` e da server: l'avvio vuoto e lo zip come sopra, il menu e `?demo` che dicono che il kit manca, nessun errore se non il file `kits/…/kit.js` che non c'è; la copia di `emoji-kit-demo.zip` con `?kit=auto-comic-sans`;
+- su una copia, tutti gli esempi di `sketch.js` scommentati insieme, a kit vuoto, con uno zip, con le auto: nessun errore;
 - con le faccine: le frecce ‹ › in tutti i livelli fino a "nessuno" (anche il primo), il clic su una riga, la tastiera (↑ ↓ ← →, spazio) senza che la pagina scorra; 3000 Random, con la faccia mai "nessuno" e gli altri livelli "nessuno" qualche centinaio di volte;
 - l'export PNG (1000 × 1000), il JSON (uguale alla combinazione in pagina, `null` per "nessuno"), la griglia (2000 × 2000);
 - il kit auto dal menu: cinque livelli da cinque pezzi, frecce, tastiera, 3000 Random con la carrozzeria mai "nessuno", la griglia;
-- su **Kit vuoto**, uno zip vecchio con le cinque cartelle senza numeri dentro una cartella in più, con un PNG trasparente, un SVG senza `width`/`height`, una `__MACOSX` e un `.txt` da ignorare: i livelli escono nell'ordine delle faccine;
+- su **Kit di esempio: nessuno**, uno zip vecchio con le cinque cartelle senza numeri dentro una cartella in più, con un PNG trasparente, un SVG senza `width`/`height`, una `__MACOSX` e un `.txt` da ignorare: i livelli escono nell'ordine delle faccine;
 - uno zip con `01_zeta/`, `2 alfa/`, `3-mezzo/` (tre quadrati rosso, verde, blu uno dentro l'altro): l'ordine delle righe e i pixel dell'emoji dicono che vince il numero, non l'alfabeto;
 - sulle faccine, il livello `4-naso` aggiunto con il campo del nome e due PNG (e prima, senza nome, il messaggio che lo chiede); poi una cartella `2-occhi/` con due pezzi che sostituisce gli occhi, e una cartella di kit intera;
 - nessun errore e nessun warning in console;
 - il pomeriggio, su una copia: scommenta le regole 1 e 3 e il colore 2, poi controlla 0 occhi chiusi con lacrima su 3000 Random, i pixel della faccia tutti nel suo colore, e 0 auto senza ruote su 3000 Random (la stessa regola sulle faccine, che non hanno ruote, non fa niente).
 
-`python test/kit_test.py --online https://neve-studio.github.io/type-emoji/` rifà le stesse prove (pomeriggio escluso) sulla pagina pubblicata, controlla la risposta 200 e salva `docs/screens/07-online.png`.
+`python test/kit_test.py --online https://neve-studio.github.io/type-emoji/` prova l'avvio vuoto sulla pagina pubblicata, rifà le prove delle faccine su `?demo` (pomeriggio escluso), controlla la risposta 200 della pagina e dei due zip in `dist/` e salva `docs/screens/07-online.png`.
 
 ![La pagina online](docs/screens/07-online.png)
 
-Lo screenshot online è ancora quello della versione con le cinque categorie fisse: i livelli liberi vanno riprovati online dopo la pubblicazione.
+Lo screenshot online è ancora quello della versione con le cinque categorie fisse: l'avvio vuoto e i livelli liberi vanno riprovati online dopo la pubblicazione.
 
 **Non provato:**
 
-- **i livelli liberi sulla pagina online**: provati solo in locale (`file://` e `http.server`), la prova `--online` va rilanciata dopo la pubblicazione;
-- **editor.p5js.org**: le istruzioni sopra sono come dovrebbe funzionare, ma non l'ho caricato lì;
-- **Safari, Firefox e il Mac**: provato con Edge su Windows e, sulla pagina online, con WebKit 18.2 di Playwright (il motore di Safari, ma girato su Windows); Safari vero su un Mac e Firefox no;
+- **l'avvio vuoto e i livelli liberi sulla pagina online**: provati solo in locale (`file://` e `http.server`), la prova `--online` va rilanciata dopo la pubblicazione;
+- **editor.p5js.org**: lo zip degli studenti è provato come copia locale dei quattro file, ma non l'ho caricato nell'editor;
+- **Safari, Firefox e il Mac**: provato con Edge e con il Chromium di Playwright su Windows e, sulla pagina online, con WebKit 18.2 di Playwright (il motore di Safari, ma girato su Windows); Safari vero su un Mac e Firefox no;
 - **gli esempi di ANIMAZIONI**: non c'è una prova automatica (lo sbattere degli occhi, il respiro, il dondolio, il sobbalzo dell'auto), vanno guardati a occhio;
 - **la scelta di una cartella vera da Finder o da Esplora risorse**: il test la passa all'input come fa Playwright, non con la finestra del sistema;
 - **il trascinamento** dei file sulla pagina: non c'è, si carica dai pulsanti;

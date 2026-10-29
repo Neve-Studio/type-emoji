@@ -1,6 +1,11 @@
-"""End-to-end check of Emoji Kit in a real headless browser (Edge via Playwright).
+"""End-to-end check of Emoji Kit in a real headless browser (Edge, or Playwright's Chromium where Edge is missing).
 
-Opens the page from file:// and from a static server. With the faces kit: cycles pieces with
+Opens the page from file:// and from a static server. Without parameters it must start empty:
+the empty state on the board, Random and exports disabled, arrows and space harmless; then a
+zip loaded after the empty start, with arrows, Random, PNG, JSON and the grid of 100. The same
+on the students' copy unpacked from dist/emoji-kit-studenti.zip (no kits/ folder), built
+first with tools/make_editor_zip.py; ?kit=auto-comic-sans on the demo zip. Every example of
+sketch.js switched on at once must not break the empty start. With ?demo (the faces kit): cycles pieces with
 the arrows (through "nessuno") and the keyboard, presses Random 3000 times (the lowest layer is
 never "nessuno"), exports PNG, JSON and the grid of 100. Switches to the car kit with the
 selector. On an empty kit loads an old zip with the five unnumbered folders, then a zip whose
@@ -11,7 +16,8 @@ errors allowed. Saves dark screenshots in docs/screens/.
 
     python test/kit_test.py
 
-With a URL it runs the same checks on the published page instead and saves 07-online.png:
+With a URL it runs the empty start and the ?demo checks on the published page instead, and
+saves 07-online.png:
 
     python test/kit_test.py --online https://neve-studio.github.io/type-emoji/
 """
@@ -32,21 +38,47 @@ from PIL import Image, ImageDraw, ImageFont
 from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "tools"))
+import make_editor_zip  # noqa: E402
+
 KIT = ROOT / "kits" / "comic-sans"
 SCREENS = ROOT / "docs" / "screens"
 FACES = {"faccia": 3, "occhi": 6, "sopracciglia": 3, "bocca": 5, "accessori": 4}
 CAR = {"carrozzeria": 5, "ruote": 5, "finestrini": 5, "fari": 5, "extra": 5}
 COMIC = "C:/Windows/Fonts/comic.ttf"
+BUTTONS = ["#random", "#png", "#json", "#grid"]
 
 
-def open_page(ctx, url):
+def open_page(ctx, url, rows=5, ready="kit.accessori?.length"):
+    """rows=0: no kit expected, wait only for the page to start."""
     page = ctx.new_page()
     page.errors = []
     page.on("console", lambda m: m.type in ("error", "warning") and page.errors.append(f"{m.type}: {m.text}"))
     page.on("pageerror", lambda e: page.errors.append(f"pageerror: {e}"))
     page.goto(url)
-    wait_rows(page, 5)
+    if rows:
+        wait_rows(page, rows, ready)
+    else:  # setup() has finished when the status says something
+        page.wait_for_function("() => document.getElementById('status').textContent", timeout=20000)
+        page.wait_for_timeout(300)
     return page
+
+
+def launch(p):
+    try:
+        return p.chromium.launch(channel="msedge")
+    except Exception:  # a PC without Edge: Playwright's own Chromium
+        return p.chromium.launch()
+
+
+def serve(directory):
+    class Quiet(http.server.SimpleHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(Quiet, directory=str(directory)))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server
 
 
 def wait_rows(page, n, ready="kit.accessori?.length"):
@@ -247,7 +279,7 @@ def run(page, out, tmp, shots):
     # an empty kit, then an old zip: five folders without numbers keep the faces order
     page.select_option("#sampleKit", "")
     wait_rows(page, 0, "true")
-    assert "Kit vuoto" in state(page)["status"]
+    assert "Nessun kit" in state(page)["status"] and page.is_visible("#empty")
     kit, zpath = make_legacy_zip(tmp)
     page.set_input_files("#zipFile", str(zpath))
     status_has(page, "mio-kit.zip")
@@ -315,6 +347,70 @@ def run(page, out, tmp, shots):
     return {"folder": folder, "random_none_faces": stats["none"]}
 
 
+def empty_flow(page, tmp, shots):
+    """The page as it starts without parameters: no kit, the empty state, nothing that breaks;
+    then a zip of a kit loaded on it, arrows, Random, PNG, JSON and the grid of 100."""
+    s = state(page)
+    assert s["layers"] == [] and s["rows"] == [] and page.input_value("#sampleKit") == "", s
+    text = page.inner_text("#empty")
+    assert page.is_visible("#empty") and all(w in text for w in ["1-faccia", "2-occhi", "SVG", "PNG", "1000 × 1000"]), text
+    assert all(page.is_disabled(b) for b in BUTTONS)
+    if shots:
+        page.screenshot(path=SCREENS / "12-avvio-vuoto.png")
+    page.mouse.click(5, 795)
+    for k in ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " ", " "]:
+        page.keyboard.press(k)
+    page.evaluate("() => { for (const b of document.querySelectorAll('#random, #png, #json, #grid')) b.click();"
+                  " randomize(); nextPiece(layers[0], 1); }")
+    page.wait_for_timeout(300)
+    assert state(page)["layers"] == [] and page.is_visible("#empty"), state(page)
+    assert not page.errors, page.errors
+
+    out, work = tmp / "out", tmp / "kit"
+    out.mkdir(parents=True), work.mkdir()
+    _, zpath = make_legacy_zip(work)
+    page.set_input_files("#zipFile", str(zpath))
+    status_has(page, "mio-kit.zip")
+    s = state(page)
+    assert s["layers"] == list(FACES) and not page.is_visible("#empty"), s
+    assert not any(page.is_disabled(b) for b in BUTTONS)
+    row(page, "occhi").locator("button").nth(1).click()
+    s2 = state(page)
+    assert s2["combo"]["occhi"] == (s["combo"]["occhi"] + 2) % 7 - 1, (s, s2)
+    page.mouse.click(5, 795)  # the occhi row is selected: its arrows were clicked
+    page.keyboard.press("ArrowRight")
+    assert state(page)["combo"]["occhi"] == (s2["combo"]["occhi"] + 2) % 7 - 1
+    page.click("#random")
+    check_random(page, "faccia")
+    png = download(page, "#png", out)
+    assert png_size(png)[0] == (1000, 1000), png
+    data = json.loads(download(page, "#json", out).read_text(encoding="utf-8"))
+    assert list(data) == list(FACES), data
+    grid = download(page, "#grid", out)
+    size, tones = png_size(grid)
+    assert size == (2000, 2000) and tones > 2, (size, tones)
+    assert not page.errors, page.errors
+    return {"empty_state": text.splitlines()[0], "zip_layers": state(page)["counts"]}
+
+
+def all_examples(ctx, tmp):
+    """Every commented example of sketch.js switched on at once: the empty start must not break,
+    nor the kits loaded after it."""
+    proj = tmp / "tutti-gli-esempi"
+    shutil.copytree(ROOT, proj, ignore=shutil.ignore_patterns(".git", "archive", "docs", "test", "tools", "dist"))
+    sk = proj / "sketch.js"
+    src, n = re.subn(r"^(\s*)// ((?:if|const|return) .*)$", r"\1\2", sk.read_text(encoding="utf-8"), flags=re.M)
+    sk.write_text(src, encoding="utf-8")
+    page = open_page(ctx, (proj / "index.html").as_uri(), 0)
+    result = empty_flow(page, tmp / "esempi", False)
+    page.select_option("#sampleKit", "auto-comic-sans")
+    wait_rows(page, 5, "kit.carrozzeria?.length")
+    page.click("#random")
+    page.wait_for_timeout(1500)  # the animations run for a while
+    assert not page.errors, page.errors
+    return {"examples_on": n, **result}
+
+
 def afternoon(ctx, tmp):
     """A copy of the project with afternoon examples switched on: closed eyes never with the
     tear, every face gives its colour to the whole emoji, the car always has wheels (a rule
@@ -327,7 +423,7 @@ def afternoon(ctx, tmp):
         assert f"// {line}" in src, line
         src = src.replace(f"// {line}", line)
     sk.write_text(src, encoding="utf-8")
-    page = open_page(ctx, (proj / "index.html").as_uri())
+    page = open_page(ctx, (proj / "index.html").as_uri() + "?demo")
     tears = page.evaluate("""() => { let n = 0; for (let i = 0; i < 3000; i++) { const c = randomCombo();
         if (nameOf('occhi', c) === 'chiusi' && nameOf('accessori', c) === 'lacrima') n++; } return n; }""")
     assert tears == 0, tears
@@ -372,22 +468,24 @@ def kit_sheet(ctx, folder, out):
 def online(url):
     with tempfile.TemporaryDirectory() as t, sync_playwright() as p:
         tmp = Path(t)
-        browser = p.chromium.launch(channel="msedge")
+        browser = launch(p)
         ctx = browser.new_context(viewport={"width": 1280, "height": 800}, color_scheme="dark", accept_downloads=True)
         probe = ctx.new_page()
         status = probe.goto(url).status
         assert status == 200, status
         probe.close()
-        page = open_page(ctx, url)
+        empty = empty_flow(open_page(ctx, url, 0), tmp / "vuoto", False)
+        page = open_page(ctx, url + "?demo")
         assert page.evaluate("() => location.protocol") == "https:"
         (tmp / "out").mkdir(), (tmp / "kit").mkdir()
         result = run(page, tmp / "out", tmp / "kit", False)
-        page.goto(url)
+        page.goto(url + "?demo")
         wait_rows(page, 5)
         set_combo(page, {"faccia": "ovale", "occhi": "stelle", "sopracciglia": "dritte", "bocca": "risata", "accessori": None})
         page.screenshot(path=SCREENS / "07-online.png")
         assert not page.errors, page.errors
-        print(json.dumps({"url": url, "status": status, **result}), flush=True)
+        zips = {z: ctx.request.get(url + "dist/" + z).status for z in ["emoji-kit-studenti.zip", "emoji-kit-demo.zip"]}
+        print(json.dumps({"url": url, "status": status, "empty": empty, "zips": zips, **result}), flush=True)
         try:
             browser.close()
         except Exception:
@@ -399,27 +497,51 @@ def main():
     if sys.argv[1:2] == ["--online"]:
         return online(sys.argv[2])
 
-    class Quiet(http.server.SimpleHTTPRequestHandler):
-        def log_message(self, *a):
-            pass
-
-    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(Quiet, directory=str(ROOT)))
-    threading.Thread(target=server.serve_forever, daemon=True).start()
+    make_editor_zip.main()
     report = {}
     with tempfile.TemporaryDirectory() as t, sync_playwright() as p:
         tmp = Path(t)
-        browser = p.chromium.launch(channel="msedge")
+        for name in ["studenti", "demo"]:
+            with zipfile.ZipFile(make_editor_zip.DIST / f"emoji-kit-{name}.zip") as z:
+                z.extractall(tmp / name)
+                report[f"zip-{name}"] = len(z.namelist())
+                assert name == "demo" or z.namelist() == make_editor_zip.FILES, z.namelist()
+        servers = [serve(ROOT), serve(tmp)]
+        here, temp = (f"http://127.0.0.1:{s.server_port}/" for s in servers)
+        browser = launch(p)
         ctx = browser.new_context(viewport={"width": 1280, "height": 800}, color_scheme="dark", accept_downloads=True)
-        for name, url, shots in [("file", (ROOT / "index.html").as_uri(), True),
-                                 ("http", f"http://127.0.0.1:{server.server_port}/index.html", False)]:
+        for name, url, shots in [("file", (ROOT / "index.html").as_uri(), True), ("http", here + "index.html", False)]:
+            report[name + "-vuoto"] = empty_flow(open_page(ctx, url, 0), tmp / f"vuoto-{name}", shots)
+            page = open_page(ctx, url + "?demo")
+            if shots:
+                set_combo(page, {"faccia": "tonda", "occhi": "stelle", "sopracciglia": "onda", "bocca": "risata", "accessori": None})
+                page.screenshot(path=SCREENS / "13-demo.png")
             out, work = tmp / f"out-{name}", tmp / f"kit-{name}"
             out.mkdir(), work.mkdir()
-            report[name] = run(open_page(ctx, url), out, work, shots)
+            report[name] = run(page, out, work, shots)
+            page = open_page(ctx, url + "?kit=auto-comic-sans", 5, "kit.carrozzeria?.length")
+            assert state(page)["layers"] == list(CAR) and not page.errors, page.errors
+
+        # the students' copy: four files, no kits/; a sample kit asked for only says it is missing
+        for name, url in [("file", (tmp / "studenti" / "index.html").as_uri()), ("http", temp + "studenti/index.html")]:
+            page = open_page(ctx, url, 0)
+            report[f"studenti-{name}"] = empty_flow(page, tmp / f"studenti-{name}", False)
+            page.select_option("#sampleKit", "comic-sans")
+            status_has(page, "non ha il kit di esempio")
+            assert state(page)["layers"] == [] and page.is_visible("#empty")
+            page = open_page(ctx, url + "?demo", 0)
+            assert "non ha il kit di esempio" in state(page)["status"] and page.is_visible("#empty")
+            # only the browser's own note about the missing kits/comic-sans/kit.js, no exception
+            assert all(e.startswith("error: Failed to load resource") for e in page.errors), page.errors
+        page = open_page(ctx, (tmp / "demo" / "index.html").as_uri() + "?kit=auto-comic-sans", 5, "kit.carrozzeria?.length")
+        assert not page.errors, page.errors
+
+        report["all_examples"] = all_examples(ctx, tmp)
         report["afternoon"] = afternoon(ctx, tmp)
         kit_sheet(ctx, "comic-sans", "03-kit-di-esempio.png")
         kit_sheet(ctx, "auto-comic-sans", "11-kit-auto.png")
         phone = browser.new_context(viewport={"width": 393, "height": 852}, device_scale_factor=2, color_scheme="dark")
-        page = open_page(phone, (ROOT / "index.html").as_uri())
+        page = open_page(phone, (ROOT / "index.html").as_uri() + "?demo")
         page.screenshot(path=SCREENS / "06-telefono.png")
         assert not page.errors, page.errors
         print(json.dumps(report, indent=1), flush=True)
@@ -427,7 +549,8 @@ def main():
             browser.close()
         except Exception:  # Edge sometimes drops the driver connection on close; the checks are done
             pass
-    server.shutdown()
+    for server in servers:
+        server.shutdown()
 
 
 if __name__ == "__main__":

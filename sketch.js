@@ -17,7 +17,7 @@ let selected = 0; // il livello scelto con le frecce su e giù
 
 async function setup() {
   createCanvas(600, 600).parent('stage');
-  await loadSampleKit(); // il kit di esempio scelto nella pagina: all'inizio le faccine
+  await loadSampleKit(); // all'inizio nessun kit: si caricano dalla pagina (?demo = le faccine)
   randomize();
 }
 

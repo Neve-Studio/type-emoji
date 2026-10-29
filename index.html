@@ -8,8 +8,6 @@
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/p5@2.3.4/lib/p5.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-  <script src="kits/comic-sans/kit.js"></script>
-  <script src="kits/auto-comic-sans/kit.js"></script>
   <script src="kit-tools.js"></script>
   <script src="sketch.js"></script>
 </head>
@@ -21,9 +19,9 @@
         <p class="tag">TYPE&amp;EMOJI · NABA · GIORNO 2</p>
       </header>
       <select id="sampleKit" aria-label="Kit di esempio">
+        <option value="">Kit di esempio: nessuno</option>
         <option value="comic-sans">Kit di esempio: faccine</option>
         <option value="auto-comic-sans">Kit di esempio: auto</option>
-        <option value="">Kit vuoto</option>
       </select>
       <div id="panel"></div>
       <p class="muted">↑ ↓ sceglie il livello · ← → cambia pezzo · spazio: Random</p>
@@ -36,7 +34,14 @@
     </aside>
 
     <section class="stage">
-      <div id="stage"></div>
+      <div id="stage">
+        <div id="empty">
+          <p><b>Nessun kit caricato.</b></p>
+          <p>Prepara una cartella per livello, col numero davanti per l'ordine dal basso: <code>1-faccia</code>, <code>2-occhi</code>, <code>3-bocca</code>…</p>
+          <p>Dentro, un file <b>SVG</b> o <b>PNG trasparente</b> per pezzo, tutti su una tavola quadrata <b>1000 × 1000</b> con lo stesso centro.</p>
+          <p>Poi caricali con i pulsanti di <b>Carica i tuoi pezzi</b>: lo zip del kit, la cartella, o un livello alla volta.</p>
+        </div>
+      </div>
       <p id="status" class="muted"></p>
     </section>
 
@@ -48,7 +53,7 @@
         <input type="text" id="layerName" placeholder="nome, es. 4-naso" aria-label="Nome del livello">
         <label class="btn">File di un livello<input type="file" id="layerFiles" accept=".svg,.png" multiple hidden></label>
       </div>
-      <p class="muted">Un livello con lo stesso nome di uno che c'è lo sostituisce; uno nuovo si aggiunge al posto del suo numero. Gli altri restano: così si mescolano i kit dei compagni. Per ripartire da zero: <b>Kit vuoto</b>.</p>
+      <p class="muted">Un livello con lo stesso nome di uno che c'è lo sostituisce; uno nuovo si aggiunge al posto del suo numero. Gli altri restano: così si mescolano i kit dei compagni. Per ripartire da zero: <b>Kit di esempio: nessuno</b>.</p>
 
       <h2>Come si prepara un kit</h2>
       <ul class="muted rules">

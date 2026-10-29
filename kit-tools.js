@@ -20,7 +20,8 @@ function splitPrefix(folder) {
   return m ? [Number(m[1]), m[2].toLowerCase()] : [Infinity, folder.trim().toLowerCase()];
 }
 
-// The sample kits come as data (kits/*/kit.js), so they also load from file://.
+// The sample kits come as data (kits/*/kit.js), so they also load from file://. They are
+// loaded only when asked for (the menu, ?demo or ?kit=): the students' copy has no kits/.
 // key '' starts from an empty kit.
 async function loadSampleKit(key = $('sampleKit').value) {
   kit = {};
@@ -30,10 +31,16 @@ async function loadSampleKit(key = $('sampleKit').value) {
   selected = 0;
   if (!key) {
     updatePanel();
-    return setStatus('Kit vuoto: carica i tuoi livelli dalla colonna di destra.');
+    return setStatus('Nessun kit: carica i tuoi livelli da «Carica i tuoi pezzi».');
+  }
+  if (!window.SAMPLE_KITS?.[key]) {
+    await new Promise((done) => document.head.append(Object.assign(document.createElement('script'), { src: `kits/${key}/kit.js`, onload: done, onerror: done })));
   }
   const sample = window.SAMPLE_KITS?.[key];
-  if (!sample) return setStatus(`Kit di esempio non trovato: manca kits/${key}/kit.js`, true);
+  if (!sample) {
+    updatePanel();
+    return setStatus(`Questa copia non ha il kit di esempio: manca kits/${key}/kit.js.`, true);
+  }
   const files = [];
   for (const [layer, pieces] of Object.entries(sample.pieces)) {
     for (const p of pieces) files.push({ path: `${layer}/${p.name}.svg`, blob: async () => new Blob([p.svg]) });
@@ -135,9 +142,12 @@ function inked(img, color) {
 
 // One row per layer, in drawing order (the first row is the bottom layer): arrow left,
 // layer and piece name, piece number, arrow right.
+// Without a kit: the empty state on the board, and nothing to randomize or export.
 function updatePanel() {
   const panel = $('panel');
-  panel.innerHTML = layers.length ? '' : '<p class="muted">Nessun livello: carica un kit dalla colonna di destra.</p>';
+  panel.innerHTML = layers.length ? '' : '<p class="muted">Nessun livello: carica un kit da «Carica i tuoi pezzi».</p>';
+  $('empty').hidden = layers.length > 0;
+  for (const id of ['random', 'png', 'json', 'grid']) $(id).disabled = !layers.length;
   layers.forEach((layer, i) => {
     const row = document.createElement('div');
     row.className = 'row' + (i === selected ? ' selected' : '');
@@ -163,6 +173,10 @@ function updatePanel() {
 const fromInput = (input) => [...input.files].map((f) => ({ path: f.webkitRelativePath || f.name, blob: async () => f }));
 
 window.addEventListener('DOMContentLoaded', () => {
+  // ?demo preloads the faces, ?kit=auto-comic-sans a given sample kit: for projecting and demo links.
+  const query = new URLSearchParams(location.search);
+  const wanted = query.get('kit') ?? (query.has('demo') ? 'comic-sans' : '');
+  if ([...$('sampleKit').options].some((o) => o.value === wanted)) $('sampleKit').value = wanted;
   // A clicked button keeps the focus, and then the space bar would click it again.
   document.addEventListener('click', (e) => e.target.closest('button')?.blur());
   $('random').onclick = () => randomize();
